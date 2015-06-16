@@ -4,10 +4,11 @@ import java.io.IOException;
 import java.lang.Math;
 import java.awt.AWTException;
 import java.awt.Robot;
+import java.awt.event.InputEvent;
 
 class SmartTVListener extends Listener {
 	public enum MyKeyBoard{
-		LEFT_ARROW (37), UP_ARROW (38), RIGHT_ARROW (39), DOWN_ARROW (40);
+		LEFT_ARROW (37), UP_ARROW (38), RIGHT_ARROW (39), DOWN_ARROW (40), ENTER(13);
 		
 		private int value;
 		 
@@ -15,13 +16,21 @@ class SmartTVListener extends Listener {
 			this.value = value;
 		}
 	}
+	static boolean bIsHorizontal = false;
 	
-	static boolean bStartLeftSwipe = false;
-	static boolean bStartRightSwipe = false;
-	static boolean bStartDownSwipe = false;
-	static boolean bStartUpSwipe = false;
-
+	int nLeftInc = 0;
+	int nRightInc = 0;
+	int nDownInc = 0;
+	int nUpInc = 0;
+	
+	static float SWIPE_DURATION = 0.0f;//0.1f;	
+	static double UNIT_VECTOR = 0.75;
+	
 	Robot robot = new Robot();
+	public static int NO_OF_IMAGES = 30;
+	static int nCurrrentImg = 1;
+	static int nCurrentVolume = 50;
+	public LeapSmartTVFrame objLeapSmartTVFrame = new LeapSmartTVFrame("./src/JPGs/Channel (" + nCurrrentImg +").jpg", "Channel : " + nCurrrentImg, "Volume : " + nCurrentVolume);
 	
 	public SmartTVListener() throws AWTException
 	{
@@ -29,15 +38,19 @@ class SmartTVListener extends Listener {
 		robot.setAutoWaitForIdle(true);
 	}
 	
-	public void ArrowsKeys(MyKeyBoard k)
+	public void PressKeyBoard(MyKeyBoard k)
 	{
-//		for(int j = 0; j < 5; ++j)
-		{
-			robot.delay(40);
-			robot.keyPress(k.value);
-			robot.keyRelease(k.value);
-		}
+		robot.delay(40);
+		robot.keyPress(k.value);
+		robot.keyRelease(k.value);
    }
+		
+	public void PressMouseLeftButton()
+	{
+		robot.delay(40);
+        robot.mousePress(InputEvent.BUTTON1_MASK);
+        robot.mouseRelease(InputEvent.BUTTON1_MASK);	
+	}
 	
     public void onInit(Controller controller) {
         System.out.println("Initialized");
@@ -46,9 +59,9 @@ class SmartTVListener extends Listener {
     public void onConnect(Controller controller) {
         System.out.println("Connected");
         controller.enableGesture(Gesture.Type.TYPE_SWIPE);
-        controller.enableGesture(Gesture.Type.TYPE_CIRCLE);
-        controller.enableGesture(Gesture.Type.TYPE_SCREEN_TAP);
-        controller.enableGesture(Gesture.Type.TYPE_KEY_TAP);
+//      controller.enableGesture(Gesture.Type.TYPE_CIRCLE);
+//      controller.enableGesture(Gesture.Type.TYPE_SCREEN_TAP);
+//      controller.enableGesture(Gesture.Type.TYPE_KEY_TAP);
     }
 
     public void onDisconnect(Controller controller) {
@@ -61,8 +74,6 @@ class SmartTVListener extends Listener {
     }
 
     public void onFrame(Controller controller) {
-    	MyKeyBoard keyBoard;
-    	
         // Get the most recent frame and report some basic information
         Frame frame = controller.frame();
 /*        System.out.println("Frame id: " + frame.id()
@@ -143,74 +154,90 @@ class SmartTVListener extends Listener {
                         sweptAngle = (circle.progress() - previousUpdate.progress()) * 2 * Math.PI;
                     }
 
-/*                    System.out.println("  Circle id: " + circle.id()
+                    /*System.out.println("  Circle id: " + circle.id()
                                + ", " + circle.state()
                                + ", progress: " + circle.progress()
                                + ", radius: " + circle.radius()
                                + ", angle: " + Math.toDegrees(sweptAngle)
-                               + ", " + clockwiseness);
-*/
+                               + ", " + clockwiseness);*/
+
                     break;
                 case TYPE_SWIPE:
                     SwipeGesture swipe = new SwipeGesture(gesture);
-                    
-                    if (swipe.state() == State.STATE_START) {
-                    	if(swipe.direction().getX() < -0.8f )		bStartLeftSwipe  = true;
-                    	else if(swipe.direction().getX() > 0.8f )	bStartRightSwipe = true;
-                    	if(swipe.direction().getY() < -0.8f )		bStartDownSwipe  = true;
-                    	else if(swipe.direction().getY() > 0.8f )	bStartUpSwipe    = true;
+                                       
+                    if (swipe.state() == State.STATE_STOP)  {
+                  //if (swipe.state() == State.STATE_START) {
                     	
-                    	
+                        float diffX = Math.abs(swipe.startPosition().getX() - swipe.position().getX());
+                        float diffY = Math.abs(swipe.startPosition().getY() - swipe.position().getY());
+                        
+                        bIsHorizontal = Math.abs(swipe.direction().getX()) > Math.abs(swipe.direction().getY()); 
+	                    if(bIsHorizontal) {
+	                        if(swipe.direction().getX() > UNIT_VECTOR){ // Right
+	                        	if(swipe.position().getX() > 100 && diffX > 180) {
+	                        		//PressKeyBoard(MyKeyBoard.RIGHT_ARROW);
+	                        		if(++nCurrrentImg > NO_OF_IMAGES) nCurrrentImg = 1;
+	                        		objLeapSmartTVFrame.ChangeChannel(nCurrrentImg);
+	                        		//PressMouseLeftButton();
+	                        		System.out.println("Right : " + nRightInc++ + " : " + swipe.position().getX() + " : " + diffX);
+	                        	}
+	                        	//else
+	                        	//	System.out.println("right" + swipe.position().getX());
+	                        } 
+	                        else if(swipe.direction().getX() < -UNIT_VECTOR){ //Left
+	                        	if (swipe.position().getX() < -100 && diffX > 180){
+		                        	//PressKeyBoard(MyKeyBoard.LEFT_ARROW);
+		                        	if(--nCurrrentImg < 1) nCurrrentImg = NO_OF_IMAGES;
+		                        	objLeapSmartTVFrame.ChangeChannel(nCurrrentImg);
+		                        	//PressMouseLeftButton();
+		                        	System.out.println("Left : " + nLeftInc++ + " : " + swipe.position().getX() + " : " + diffX);
+	                        	}
+	                        	//else
+	                        	//	System.out.println("left" + swipe.position().getX());
+	                        }
+	                    } else { //vertical
+	                        if(swipe.direction().getY() > UNIT_VECTOR){ //Up
+	                        	if(diffY > 200 && swipe.position().getY() > 450) {
+	                        		//PressKeyBoard(MyKeyBoard.UP_ARROW);
+	                        		if(swipe.speed() > 500) nCurrentVolume += 9; 
+	                        		if(++nCurrentVolume > 100) nCurrentVolume = 100;
+		                        	objLeapSmartTVFrame.ChangeVolume(nCurrentVolume);
+	                        		System.out.println("UP : " + nUpInc++ + " : " + swipe.position().getY() + " : " + diffY + ", Speed : " + swipe.speed());
+	                        	}
+//	                        	else
+//	                        		System.out.println("Missed UP : " + diffY + " : " + swipe.position().getY());
+	                        } 
+	                        else if(swipe.direction().getY() < -UNIT_VECTOR){ //Down
+	                        	if(diffY > 200 && swipe.position().getY() < 60) {
+	                        		//PressKeyBoard(MyKeyBoard.DOWN_ARROW);
+	                        		if(swipe.speed() > 90) nCurrentVolume -= 9; 
+	                        		if(--nCurrentVolume < 1) nCurrentVolume = 0;
+		                        	objLeapSmartTVFrame.ChangeVolume(nCurrentVolume);
+	                        		System.out.println("Down : " + nDownInc++ + " : " + swipe.position().getY() + " : " + diffY + ", Speed :" + swipe.speed());
+	                        	}
+//	                        	else
+//	                        		System.out.println("Missed Down : " + diffY + " : " + swipe.position().getY());
+	                        }               
+	                    }
                     }
-                    
-                    if (swipe.state() == State.STATE_STOP) {
-                    	if(bStartLeftSwipe ==  true){
-                    		ArrowsKeys(MyKeyBoard.LEFT_ARROW);
-                    		bStartLeftSwipe = false;
-                    	}
-                    	if(bStartRightSwipe ==  true){
-                    		ArrowsKeys(MyKeyBoard.RIGHT_ARROW);
-                    		bStartRightSwipe = false;
-                    	}
-                    	if(bStartDownSwipe ==  true){
-                    		ArrowsKeys(MyKeyBoard.DOWN_ARROW);
-                    		bStartDownSwipe = false;
-                    	}
-                    	if(bStartUpSwipe ==  true){
-                    		ArrowsKeys(MyKeyBoard.UP_ARROW);
-                    		bStartUpSwipe = false;
-                    	}
-                    
-                    
-                    }
-                    /*
-                    if (swipe.state() == State.STATE_START) {
-                    	if(swipe.direction().getX() < -0.8f )
-                    		ArrowsKeys(MyKeyBoard.LEFT_ARROW);
-                    	else if(swipe.direction().getX() > 0.8f )
-                    		ArrowsKeys(MyKeyBoard.RIGHT_ARROW);
-                    	
-                    	if(swipe.direction().getY() < -0.8f )
-                    		ArrowsKeys(MyKeyBoard.DOWN_ARROW);
-                    	else if(swipe.direction().getY() > 0.8f )
-                    		ArrowsKeys(MyKeyBoard.UP_ARROW);
-                    }*/
-                    System.out.println("  Swipe id: " + swipe.id()
+                    /*System.out.println("  Swipe id: " + swipe.id()
                                + ", " + swipe.state()
                                + ", position: " + swipe.position()
                                + ", direction: " + swipe.direction()
-                               + ", speed: " + swipe.speed());
+                               + ", speed: " + swipe.speed());*/
                     break;
                 case TYPE_SCREEN_TAP:
                     ScreenTapGesture screenTap = new ScreenTapGesture(gesture);
-/*	                    System.out.println("  Screen Tap id: " + screenTap.id()
+                    /*
+	                    System.out.println("  Screen Tap id: " + screenTap.id()
                                + ", " + screenTap.state()
                                + ", position: " + screenTap.position()
-                               + ", direction: " + screenTap.direction());
-*/
+                               + ", direction: " + screenTap.direction());*/
+	                    //PressKeyBoard(MyKeyBoard.ENTER);
                     break;
                 case TYPE_KEY_TAP:
                     KeyTapGesture keyTap = new KeyTapGesture(gesture);
+
 /*                    System.out.println("  Key Tap id: " + keyTap.id()
                                + ", " + keyTap.state()
                                + ", position: " + keyTap.position()
@@ -230,19 +257,18 @@ class SmartTVListener extends Listener {
 }
 
 public class LeapSmartTV {
-	public static void main(String[] args) throws AWTException
-	{	
-		new LeapSmartTV();
-		
-        // Create a sample listener and controller
+	public static void main(String[] args) throws AWTException, Exception
+	{ 
 		SmartTVListener listener = new SmartTVListener();
         Controller controller = new Controller();
-
         // Have the sample listener receive events from the controller
         controller.addListener(listener);
         
-     // here i set the app to run in background:
+        // Here I set the app to run in background:
         controller.setPolicyFlags(Controller.PolicyFlag.POLICY_BACKGROUND_FRAMES);
+        //controller.config().setFloat("Gesture.Swipe.MinLength", 200); //Default 150
+        //controller.config().setFloat("Gesture.Swipe.MinVelocity", 1000);//Default 1000
+        //controller.config().save();
 
         // Keep this process running until Enter is pressed
         System.out.println("Press Enter to quit...");
@@ -251,7 +277,6 @@ public class LeapSmartTV {
         } catch (IOException e) {
             e.printStackTrace();
         }
-
         // Remove the sample listener when done
         controller.removeListener(listener);
     }
